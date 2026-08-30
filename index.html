@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="PhishGuard — Phishing email analyzer. Identify suspicious senders, malicious URLs, and social engineering patterns." />
+  <title>PhishGuard — Email Threat Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar" id="navbar" role="navigation" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo" aria-label="PhishGuard home">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+        <span>PhishGuard</span>
+      </a>
+
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="navLinks">
+        <span></span><span></span><span></span>
+      </button>
+
+      <div class="nav-links" id="navLinks">
+        <a href="#analyzer" class="nav-link">Analyzer</a>
+        <a href="#how-it-works" class="nav-link">How It Works</a>
+        <a href="#about" class="nav-link">About</a>
+        <a href="#analyzer" class="nav-btn">Analyze Email</a>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+
+    <!-- INTRO / HERO -->
+    <section class="intro" id="home" aria-labelledby="intro-heading">
+      <div class="page-container">
+        <div class="intro-inner">
+          <div class="intro-text">
+            <div class="intro-tag">Email Threat Analysis</div>
+            <h1 class="intro-heading" id="intro-heading">
+              Analyze suspicious emails<br>for phishing indicators.
+            </h1>
+            <p class="intro-sub">
+              Paste an email or upload a .eml file. PhishGuard checks sender authenticity,
+              embedded URLs, credential requests, and social engineering patterns — and returns
+              a structured threat report.
+            </p>
+            <div class="intro-actions">
+              <a href="#analyzer" class="btn btn-primary">Open Analyzer</a>
+              <a href="#how-it-works" class="btn btn-outline">How It Works</a>
+            </div>
+          </div>
+          <div class="intro-meta" aria-hidden="true">
+            <div class="meta-row">
+              <span class="meta-key">Indicators checked</span>
+              <span class="meta-val">40+</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">Avg. analysis time</span>
+              <span class="meta-val">&lt; 3s</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">Input formats</span>
+              <span class="meta-val">.eml · .txt · paste</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-key">Data stored</span>
+              <span class="meta-val">Never</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ANALYZER -->
+    <section class="tool-section" id="analyzer" aria-labelledby="tool-heading">
+      <div class="page-container">
+
+        <div class="tool-header">
+          <h2 class="tool-heading" id="tool-heading">Email Analyzer</h2>
+          <p class="tool-sub">Paste raw email content — including headers — for the most accurate results. <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to run.</p>
+        </div>
+
+        <!-- INPUT CARD -->
+        <div class="input-card" id="analyzerCard" role="region" aria-label="Email input">
+
+          <!-- TABS -->
+          <div class="tab-row" role="tablist" aria-label="Input method">
+            <button class="tab" id="tab-paste" role="tab" aria-selected="true" aria-controls="panel-paste" data-tab="paste">Paste Email</button>
+            <button class="tab" id="tab-upload" role="tab" aria-selected="false" aria-controls="panel-upload" data-tab="upload">Upload .eml</button>
+          </div>
+
+          <!-- PASTE PANEL -->
+          <div class="tab-panel" id="panel-paste" role="tabpanel" aria-labelledby="tab-paste">
+            <textarea
+              id="emailInput"
+              class="email-input"
+              placeholder="From: security@paypa1-verify.net&#10;To: user@example.com&#10;Subject: Urgent: Account suspended&#10;&#10;Dear customer, your account has been restricted. Click here to verify:&#10;http://paypa1-verify.net/secure/login"
+              aria-label="Email content"
+              aria-describedby="charCounter"
+              maxlength="50000"
+              spellcheck="false"
+            ></textarea>
+            <div class="input-footer">
+              <span class="char-count" id="charCounter" aria-live="polite">0 / 50,000</span>
+              <span class="input-hint">Tip: include email headers (From, To, Subject) for deeper analysis</span>
+            </div>
+          </div>
+
+          <!-- UPLOAD PANEL -->
+          <div class="tab-panel hidden" id="panel-upload" role="tabpanel" aria-labelledby="tab-upload">
+            <div class="drop-zone" id="uploadArea" role="button" tabindex="0" aria-label="Upload email file — drag and drop or click to browse">
+              <input type="file" id="fileInput" accept=".eml,.txt" aria-hidden="true" tabindex="-1" />
+
+              <div id="uploadIdle">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="36" height="36" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <p class="drop-title">Drop .eml file here</p>
+                <p class="drop-sub">or <button type="button" class="link-btn" id="browseBtn">choose file</button> — .eml, .txt &mdash; max 10 MB</p>
+              </div>
+
+              <div id="uploadSelected" class="hidden" aria-live="polite">
+                <div class="file-row">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <span class="file-name" id="fileName">—</span>
+                  <span class="file-size" id="fileSize">—</span>
+                  <button type="button" class="file-remove-btn" id="fileRemove" aria-label="Remove file">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="drop-overlay hidden" id="dragOverlay" aria-hidden="true">Drop to upload</div>
+            </div>
+          </div>
+
+          <!-- ACTIONS -->
+          <div class="card-actions">
+            <button type="button" class="btn btn-ghost" id="clearBtn">Clear</button>
+            <button type="button" class="btn btn-primary" id="analyzeBtn">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              Run Analysis
+            </button>
+          </div>
+        </div>
+
+        <!-- SCAN LOADER -->
+        <div class="scan-loader hidden" id="scanLoader" role="status" aria-live="polite" aria-label="Analysis in progress">
+          <div class="loader-inner">
+            <div class="loader-bar-wrap" aria-hidden="true">
+              <div class="loader-bar" id="loaderBar"></div>
+            </div>
+            <div class="loader-steps" id="loaderSteps">
+              <div class="lstep" id="step-1" role="listitem"><span class="lstep-dot"></span><span class="lstep-text">Parsing email structure</span></div>
+              <div class="lstep" id="step-2" role="listitem"><span class="lstep-dot"></span><span class="lstep-text">Checking sender domain</span></div>
+              <div class="lstep" id="step-3" role="listitem"><span class="lstep-dot"></span><span class="lstep-text">Extracting and resolving links</span></div>
+              <div class="lstep" id="step-4" role="listitem"><span class="lstep-dot"></span><span class="lstep-text">Detecting social engineering patterns</span></div>
+              <div class="lstep" id="step-5" role="listitem"><span class="lstep-dot"></span><span class="lstep-text">Computing risk score</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RESULTS -->
+        <div class="results hidden" id="resultsDashboard" role="region" aria-label="Analysis results" aria-live="polite">
+
+          <!-- RESULTS HEADER BAR -->
+          <div class="results-bar">
+            <div class="results-bar-left">
+              <span class="results-label">Analysis Report</span>
+              <span class="results-ts" id="analysisTimestamp"></span>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" id="newAnalysisBtn">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+              New Analysis
+            </button>
+          </div>
+
+          <!-- VERDICT STRIP -->
+          <div class="verdict-strip" id="verdictStrip" role="status" aria-live="polite">
+            <div class="verdict-score">
+              <span class="vs-number" id="scoreNumber">—</span>
+              <span class="vs-denom">/100</span>
+            </div>
+            <div class="verdict-divider" aria-hidden="true"></div>
+            <div class="verdict-level" id="verdictLevel">
+              <span class="vl-dot" id="verdictDot" aria-hidden="true"></span>
+              <span id="riskLabel">—</span>
+            </div>
+            <div class="verdict-breakdown" aria-label="Score breakdown">
+              <div class="vb-item">
+                <span class="vb-label">Sender</span>
+                <div class="vb-track"><div class="vb-fill" id="bar-sender"></div></div>
+                <span class="vb-pct" id="pct-sender">—</span>
+              </div>
+              <div class="vb-item">
+                <span class="vb-label">Links</span>
+                <div class="vb-track"><div class="vb-fill" id="bar-links"></div></div>
+                <span class="vb-pct" id="pct-links">—</span>
+              </div>
+              <div class="vb-item">
+                <span class="vb-label">Content</span>
+                <div class="vb-track"><div class="vb-fill" id="bar-content"></div></div>
+                <span class="vb-pct" id="pct-content">—</span>
+              </div>
+              <div class="vb-item">
+                <span class="vb-label">Attach</span>
+                <div class="vb-track"><div class="vb-fill" id="bar-attachment"></div></div>
+                <span class="vb-pct" id="pct-attachment">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- THREAT TABLE -->
+          <div class="result-block" role="region" aria-label="Threat indicators">
+            <h3 class="block-heading">Threat Indicators</h3>
+            <div class="threat-table" id="threatCards" role="list"></div>
+          </div>
+
+          <!-- FINDINGS -->
+          <div class="result-block" role="region" aria-label="Detailed findings">
+            <div class="block-heading-row">
+              <h3 class="block-heading">Findings</h3>
+              <span class="block-count" id="findingsCount"></span>
+            </div>
+            <div class="findings-table" id="findingsList" role="list"></div>
+          </div>
+
+          <!-- RECOMMENDATION -->
+          <div class="rec-block" id="recommendationCard" role="alert" aria-live="polite">
+            <div class="rec-label">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              Recommendation
+            </div>
+            <p class="rec-text" id="recommendationText"></p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section class="how-section" id="how-it-works" aria-labelledby="how-heading">
+      <div class="page-container">
+        <div class="how-inner">
+          <div class="how-header">
+            <h2 class="how-heading" id="how-heading">How it works</h2>
+            <p class="how-sub">Three steps from submission to threat report.</p>
+          </div>
+          <ol class="how-steps" role="list">
+            <li class="how-step">
+              <span class="step-n" aria-hidden="true">1</span>
+              <div class="step-body">
+                <strong>Submit email content</strong>
+                <p>Paste the raw email text — headers and body — or upload a .eml or .txt file directly.</p>
+              </div>
+            </li>
+            <li class="how-step">
+              <span class="step-n" aria-hidden="true">2</span>
+              <div class="step-body">
+                <strong>Indicator analysis</strong>
+                <p>The engine checks 40+ signals: sender domain alignment, URL structure, credential-request language, header spoofing, and attachment risk.</p>
+              </div>
+            </li>
+            <li class="how-step">
+              <span class="step-n" aria-hidden="true">3</span>
+              <div class="step-body">
+                <strong>Structured threat report</strong>
+                <p>Results include a risk score (0–100), per-indicator findings with severity ratings, and a clear security recommendation.</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="about-section" id="about" aria-labelledby="about-heading">
+      <div class="page-container">
+        <div class="about-inner">
+          <div class="about-header">
+            <h2 class="about-heading" id="about-heading">About PhishGuard</h2>
+          </div>
+          <div class="about-body">
+            <p>
+              PhishGuard is a static analysis tool for identifying phishing indicators in email content.
+              It examines sender domain alignment, embedded URL patterns, urgency and manipulation language,
+              credential-request phrasing, attachment indicators, and header anomalies.
+            </p>
+            <p>
+              Email content is sent to the local FastAPI backend for analysis and is never stored or
+              logged. PhishGuard is intended as a supplemental tool — it does not replace a full security stack.
+            </p>
+            <div class="about-props">
+              <div class="about-prop">
+                <span class="prop-key">Input formats</span>
+                <span class="prop-val">.eml, .txt, plain text paste</span>
+              </div>
+              <div class="about-prop">
+                <span class="prop-key">Data retention</span>
+                <span class="prop-val">None — analysis is local only</span>
+              </div>
+              <div class="about-prop">
+                <span class="prop-key">Indicators</span>
+                <span class="prop-val">Sender, URL, content, attachment</span>
+              </div>
+              <div class="about-prop">
+                <span class="prop-key">Backend required</span>
+                <span class="prop-val">Yes — FastAPI on port 8000</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer" role="contentinfo">
+    <div class="page-container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+          <span>PhishGuard</span>
+          <span class="footer-sep" aria-hidden="true">·</span>
+          <span>Cybersecurity Email Analysis</span>
+        </div>
+        <div class="footer-nav">
+          <a href="#analyzer" class="footer-link">Analyzer</a>
+          <a href="#how-it-works" class="footer-link">How It Works</a>
+          <a href="#about" class="footer-link">About</a>
+          <span class="footer-copy">&copy; 2026 PhishGuard</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/mockData.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
