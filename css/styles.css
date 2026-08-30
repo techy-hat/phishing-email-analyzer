@@ -1148,3 +1148,115 @@ kbd {
   .rec-block      { flex-direction: column; gap: 6px; }
   .rec-label      { min-width: unset; }
 }
+
+/* ─── Verdict sub-strip (classification + confidence) ─── */
+.verdict-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 20px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-top: none;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.vs-class {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.vs-class.high   { color: var(--danger); }
+.vs-class.medium { color: var(--warn); }
+.vs-class.low    { color: var(--ok); }
+
+.vs-meta strong { color: var(--text-1); font-family: var(--mono); }
+
+/* ─── Email Authentication grid ─── */
+.auth-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.auth-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.auth-name {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.auth-state {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+.auth-state.pass { color: var(--ok);    border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+.auth-state.fail { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.auth-state.na   { color: var(--text-3); border-color: var(--border); background: var(--bg-raised); }
+
+.auth-note {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-3);
+  margin: 0;
+}
+
+/* ─── Evidence ("why this email was flagged") ─── */
+.evidence-summary {
+  font-size: 13px;
+  color: var(--text-2);
+  margin: 0 0 10px 0;
+}
+
+.evidence-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.evidence-item {
+  position: relative;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-1);
+}
+.evidence-item::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+
+@media (max-width: 640px) {
+  .auth-grid { grid-template-columns: 1fr; }
+  .verdict-sub { flex-direction: column; align-items: flex-start; }
+}

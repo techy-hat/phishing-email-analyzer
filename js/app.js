@@ -60,13 +60,22 @@ const dom = {
   barLinks:           $('bar-links'),
   barContent:         $('bar-content'),
   barAttachment:      $('bar-attachment'),
+  barHeader:          $('bar-header'),
   pctSender:          $('pct-sender'),
   pctLinks:           $('pct-links'),
   pctContent:         $('pct-content'),
   pctAttachment:      $('pct-attachment'),
+  pctHeader:          $('pct-header'),
+  classificationLabel: $('classificationLabel'),
+  confidenceValue:    $('confidenceValue'),
+  authSpf:            $('auth-spf'),
+  authDkim:           $('auth-dkim'),
+  authDmarc:          $('auth-dmarc'),
   threatCards:        $('threatCards'),
   findingsList:       $('findingsList'),
   findingsCount:      $('findingsCount'),
+  evidenceSummary:    $('evidenceSummary'),
+  evidenceList:       $('evidenceList'),
   recommendationText: $('recommendationText'),
   recommendationCard: $('recommendationCard')
 };
@@ -258,7 +267,8 @@ function runLoader() {
 // ─── [7] RESULTS RENDERING ───────────────────────────────────────────────────
 
 function renderResults(result) {
-  const { score, level, breakdown, threats, findings, recommendation } = result;
+  const { score, level, breakdown, threats, findings, recommendation,
+          confidence, classification, authentication, evidence } = result;
   const lvl = level.toLowerCase();
 
   // Timestamp
@@ -270,16 +280,28 @@ function renderResults(result) {
   dom.verdictStrip.className = 'verdict-strip ' + lvl;
   dom.riskLabel.textContent = level + ' RISK';
 
+  // Classification + confidence
+  const classLabel = ({ likely_phishing: 'Phishing', suspicious: 'Suspicious', likely_benign: 'Likely benign' }[classification] || classification);
+  dom.classificationLabel.textContent = classLabel;
+  dom.classificationLabel.className = 'vs-class ' + lvl;
+  dom.confidenceValue.textContent = '~' + Math.round((confidence ?? 0) * 100) + '%';
+
   // Animate score number
   animateNum(dom.scoreNumber, 0, score, 1200);
 
-  // Breakdown bars
+  // Breakdown bars (include new header category if present)
   setTimeout(() => {
     setBar(dom.barSender, dom.pctSender, breakdown.sender, lvl);
     setBar(dom.barLinks,  dom.pctLinks,  breakdown.links,  lvl);
     setBar(dom.barContent, dom.pctContent, breakdown.content, lvl);
     setBar(dom.barAttachment, dom.pctAttachment, breakdown.attachment, lvl);
+    if (dom.barHeader) setBar(dom.barHeader, dom.pctHeader, breakdown.header, lvl);
   }, 300);
+
+  // Authentication grid
+  setAuth('spf',   authentication);
+  setAuth('dkim',  authentication);
+  setAuth('dmarc', authentication);
 
   // Threat table
   dom.threatCards.innerHTML = '';
@@ -317,6 +339,27 @@ function renderResults(result) {
     dom.findingsList.appendChild(row);
   });
 
+  // Evidence ("why this email was flagged")
+  const evidenceItems = Array.isArray(evidence) ? evidence : [];
+  if (evidenceItems.length > 1) {
+    // Last item is the methodological caveat; keep it as a footer note.
+    const caveat = evidenceItems[evidenceItems.length - 1];
+    const bullets = evidenceItems.slice(0, -1);
+    dom.evidenceSummary.textContent = bullets.length
+      ? 'This email was flagged for the following reason(s):'
+      : 'No high-confidence suspicious indicators were detected.';
+    dom.evidenceList.innerHTML = '';
+    bullets.forEach(b => {
+      const li = document.createElement('li');
+      li.className = 'evidence-item';
+      li.textContent = b;
+      dom.evidenceList.appendChild(li);
+    });
+  } else {
+    dom.evidenceSummary.textContent = 'No high-confidence suspicious indicators were detected.';
+    dom.evidenceList.innerHTML = '';
+  }
+
   // Recommendation
   dom.recommendationText.textContent = recommendation;
   dom.recommendationCard.className = 'rec-block ' + lvl;
@@ -326,6 +369,26 @@ function renderResults(result) {
   setTimeout(() => {
     dom.resultsDashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 80);
+}
+
+function setAuth(mech, authentication) {
+  const stateEl = mech === 'spf' ? dom.authSpf : mech === 'dkim' ? dom.authDkim : dom.authDmarc;
+  if (!stateEl) return;
+  const val = (authentication && authentication[mech]) || null;
+  const item = stateEl.closest('.auth-item');
+  if (val === 'pass') {
+    stateEl.textContent = 'PASS';
+    stateEl.className = 'auth-state pass';
+    item && item.setAttribute('data-sev', 'pass');
+  } else if (['fail', 'softfail', 'neutral', 'none', 'hardfail'].includes(val)) {
+    stateEl.textContent = val.toUpperCase();
+    stateEl.className = 'auth-state fail';
+    item && item.setAttribute('data-sev', 'fail');
+  } else {
+    stateEl.textContent = 'NOT PROVIDED';
+    stateEl.className = 'auth-state na';
+    item && item.setAttribute('data-sev', 'na');
+  }
 }
 
 function setBar(barEl, pctEl, value, levelClass) {
@@ -408,22 +471,36 @@ async function handleAnalyze() {
   dom.scanLoader.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
   try {
-    // Resolve email content — read file as text if upload tab is active
-    let content;
-    if (state.activeTab === 'paste') {
-      content = dom.emailInput.value;
-    } else {
-      content = await readFileAsText(state.selectedFile);
-    }
-
-    // ── Real API call to FastAPI backend ─────────────────────────────────────
+    // ── API call to FastAPI backend ─────────────────────────────────────────
     let response;
+    const isEml = state.activeTab === 'upload' &&
+      state.selectedFile &&
+      state.selectedFile.name.toLowerCase().endsWith('.eml');
+
     try {
-      response = await fetch('http://127.0.0.1:8000/api/analyze', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email: content })
-      });
+      if (isEml) {
+        // Send the .eml file as a proper multipart upload so the backend can
+        // parse the full header block (SPF/DKIM/DMARC, Reply-To, Return-Path).
+        const fd = new FormData();
+        fd.append('file', state.selectedFile, state.selectedFile.name);
+        response = await fetch('http://127.0.0.1:8000/api/analyze-eml', {
+          method: 'POST',
+          body: fd
+        });
+      } else {
+        // Paste (or .txt upload) — send raw text to the JSON endpoint.
+        let content;
+        if (state.activeTab === 'paste') {
+          content = dom.emailInput.value;
+        } else {
+          content = await readFileAsText(state.selectedFile);
+        }
+        response = await fetch('http://127.0.0.1:8000/api/analyze', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ email: content })
+        });
+      }
     } catch (networkErr) {
       // Network-level failure (server not running, CORS pre-flight refused, etc.)
       throw new ApiError(
@@ -438,7 +515,9 @@ async function handleAnalyze() {
       throw new ApiError(`Analysis failed: ${detail}`);
     }
 
-    const result = await response.json();
+    const body = await response.json();
+    // The .eml endpoint wraps the result in { detail, result }; unwrap it.
+    const result = body && body.result ? body.result : body;
     // ─────────────────────────────────────────────────────────────────────────
 
     finishLoader();

@@ -5,6 +5,7 @@ import pytest
 from analyzer.attachment_analyzer import AttachmentAnalysisResult, AttachmentFinding
 from analyzer.content_analyzer import ContentAnalysisResult, ContentFinding
 from analyzer.email_parser import parse_email
+from analyzer.header_analyzer import HeaderAnalysisResult, AuthStatus, HeaderFinding
 from analyzer.risk_engine import (
     SenderAnalysisResult,
     SenderFinding,
@@ -35,10 +36,20 @@ def _attachment(score, findings=None, attachments=None):
     )
 
 
+def _header(score=0, findings=None, auth=None, has_headers=True):
+    return HeaderAnalysisResult(
+        score=score,
+        findings=findings or [],
+        auth=auth or AuthStatus(spf=None, dkim=None, dmarc=None, present=has_headers),
+        has_headers=has_headers,
+        summary="",
+    )
+
+
 def test_low_risk_level():
     risk = build_risk_result(
         parse_email("From: a@example.com\n\nhi"),
-        _sender(0), _url(0), _content(0), _attachment(0),
+        _sender(0), _url(0), _content(0), _attachment(0), _header(0),
     )
     assert risk.level in ("LOW", "MEDIUM")  # baseline low
     assert risk.score < 35
@@ -47,7 +58,7 @@ def test_low_risk_level():
 def test_high_risk_level_when_all_high():
     risk = build_risk_result(
         parse_email("From: a@example.com\n\nhi"),
-        _sender(90), _url(95), _content(80), _attachment(70),
+        _sender(90), _url(95), _content(80), _attachment(70), _header(60),
     )
     assert risk.level == "HIGH"
     assert risk.score >= 65
@@ -56,18 +67,21 @@ def test_high_risk_level_when_all_high():
 def test_weights_sum_to_one():
     from analyzer.risk_engine import (
         SENDER_WEIGHT, LINKS_WEIGHT, CONTENT_WEIGHT, ATTACHMENT_WEIGHT,
+        HEADER_WEIGHT,
     )
-    total = SENDER_WEIGHT + LINKS_WEIGHT + CONTENT_WEIGHT + ATTACHMENT_WEIGHT
+    total = SENDER_WEIGHT + LINKS_WEIGHT + CONTENT_WEIGHT + ATTACHMENT_WEIGHT + HEADER_WEIGHT
     assert round(total, 6) == 1.0
 
 
-def test_breakdown_contains_attachment():
+def test_breakdown_contains_attachment_and_header():
     risk = build_risk_result(
         parse_email("From: a@example.com\n\nhi"),
-        _sender(10), _url(20), _content(15), _attachment(60),
+        _sender(10), _url(20), _content(15), _attachment(60), _header(40),
     )
     assert "attachment" in risk.breakdown
+    assert "header" in risk.breakdown
     assert risk.breakdown["attachment"] == 60
+    assert risk.breakdown["header"] == 40
 
 
 def test_attachment_threat_card_no_longer_not_analyzed():
@@ -77,6 +91,7 @@ def test_attachment_threat_card_no_longer_not_analyzed():
         _attachment(80, findings=[
             AttachmentFinding(rule="R-A1", filename="x.exe", detail="dangerous", points=35)
         ], attachments=[{"filename": "x.exe", "content_type": "application/octet-stream", "size": 1}]),
+        _header(0),
     )
     cards = {t["id"]: t for t in risk.threats}
     assert cards["attachment"]["severity"] == "HIGH"
@@ -86,7 +101,7 @@ def test_attachment_threat_card_no_longer_not_analyzed():
 def test_empty_input_safe_finding():
     risk = build_risk_result(
         parse_email("From: a@example.com\n\njust a note, nothing suspicious"),
-        _sender(0), _url(0), _content(0), _attachment(0),
+        _sender(0), _url(0), _content(0), _attachment(0), _header(0),
     )
     # With no findings at all, a SAFE finding should be present
     labels = [f["label"] for f in risk.findings]

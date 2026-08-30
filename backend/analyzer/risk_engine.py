@@ -39,13 +39,18 @@ from .email_parser     import ParsedEmail
 from .url_analyzer     import UrlAnalysisResult
 from .content_analyzer import ContentAnalysisResult
 from .attachment_analyzer import AttachmentAnalysisResult
+from .header_analyzer  import HeaderAnalysisResult
 
 
 # ── Scoring weights ───────────────────────────────────────────────────────────
-SENDER_WEIGHT      = 0.30
-LINKS_WEIGHT       = 0.35
-CONTENT_WEIGHT     = 0.20
-ATTACHMENT_WEIGHT  = 0.15
+# Total must sum to 1.0. The header/auth layer is new; weights are shifted so
+# the existing four vectors retain their relative ordering while also giving
+# authentication meaningful weight (per the product spec: header signals 0–20).
+SENDER_WEIGHT      = 0.25
+LINKS_WEIGHT       = 0.30
+CONTENT_WEIGHT     = 0.15
+ATTACHMENT_WEIGHT  = 0.10
+HEADER_WEIGHT      = 0.20
 
 # ── Risk level thresholds ─────────────────────────────────────────────────────
 HIGH_THRESHOLD   = 65
@@ -104,13 +109,23 @@ class SenderAnalysisResult:
 
 @dataclass
 class RiskResult:
-    """Final risk verdict — exactly matches the frontend API contract."""
-    score:          int             # 0–100 overall
+    """Final risk verdict — exactly matches the frontend API contract.
+
+    `confidence` (0–1) is distinct from `score`: score measures how much
+    suspicious *evidence* was found, while confidence measures how much
+    reliable evidence the analysis was actually based on (a pasted email
+    with no headers yields lower confidence even when an indicator fires).
+    """
+    score:          int             # 0–100 overall threat score
     level:          str             # "HIGH" | "MEDIUM" | "LOW"
-    breakdown:      Dict[str, int]  # {sender, links, content}
+    breakdown:      Dict[str, int]  # {sender, links, content, attachment, header}
     threats:        List[Dict]      # threat-card objects
     findings:       List[Dict]      # finding-row objects
     recommendation: str
+    confidence:     float = 0.0     # 0.0–1.0 detection confidence
+    authentication: Dict = field(default_factory=dict)  # SPF/DKIM/DMARC + present
+    evidence:       List[str] = field(default_factory=list)  # human-readable "why" bullets
+    classification: str = ""        # likely_phishing | suspicious | likely_benign
 
 
 # ── Sender Analysis ───────────────────────────────────────────────────────────
@@ -246,13 +261,14 @@ def build_risk_result(
     url_result:      UrlAnalysisResult,
     content_result:  ContentAnalysisResult,
     attachment_result: AttachmentAnalysisResult,
+    header_result:   HeaderAnalysisResult,
 ) -> RiskResult:
     """
     Combine sub-scores into a final RiskResult that matches the frontend contract.
 
     Aggregation (max-boost):
-      base    = sender*0.30 + links*0.35 + content*0.20 + attachment*0.15
-      boost   = max(sender, links, content, attachment) * 0.80
+      base    = sender*0.25 + links*0.30 + content*0.15 + attachment*0.10 + header*0.20
+      boost   = max(sender, links, content, attachment, header) * 0.80
       overall = max(base, boost)
 
     This prevents a single clearly-malicious sub-score from being diluted
@@ -264,7 +280,8 @@ def build_risk_result(
         sender_result.score      * SENDER_WEIGHT      +
         url_result.score         * LINKS_WEIGHT       +
         content_result.score     * CONTENT_WEIGHT     +
-        attachment_result.score  * ATTACHMENT_WEIGHT
+        attachment_result.score  * ATTACHMENT_WEIGHT  +
+        header_result.score      * HEADER_WEIGHT
     )
 
     # ── Dominant-signal boost ─────────────────────────────────────────────────
@@ -276,6 +293,7 @@ def build_risk_result(
         url_result.score,
         content_result.score,
         attachment_result.score,
+        header_result.score,
     )
     boost    = max_sub * 0.80
 
@@ -290,22 +308,45 @@ def build_risk_result(
     else:
         level = "LOW"
 
+    # ── Classification ────────────────────────────────────────────────────────
+    if level == "HIGH":
+        classification = "likely_phishing"
+    elif level == "MEDIUM":
+        classification = "suspicious"
+    else:
+        classification = "likely_benign"
+
     # ── Breakdown ─────────────────────────────────────────────────────────────
     breakdown = {
         "sender":     sender_result.score,
         "links":      url_result.score,
         "content":    content_result.score,
         "attachment": attachment_result.score,
+        "header":     header_result.score,
     }
 
+    # ── Confidence ────────────────────────────────────────────────────────────
+    confidence = _compute_confidence(parsed, header_result, sender_result, url_result, content_result, attachment_result)
+
     # ── Threat cards ──────────────────────────────────────────────────────────
-    threats = _build_threats(sender_result, url_result, content_result, attachment_result, level)
+    threats = _build_threats(sender_result, url_result, content_result, attachment_result, header_result, level)
 
     # ── Findings list ─────────────────────────────────────────────────────────
-    findings = _build_findings(sender_result, url_result, content_result, attachment_result)
+    findings = _build_findings(sender_result, url_result, content_result, attachment_result, header_result)
+
+    # ── Evidence ("why was this flagged") ─────────────────────────────────────
+    evidence = _build_evidence(level, sender_result, url_result, content_result, attachment_result, header_result)
 
     # ── Recommendation ────────────────────────────────────────────────────────
-    recommendation = _build_recommendation(level, sender_result, url_result, content_result, attachment_result)
+    recommendation = _build_recommendation(level, sender_result, url_result, content_result, attachment_result, header_result)
+
+    # ── Authentication summary ────────────────────────────────────────────────
+    authentication = {
+        "spf":    header_result.auth.spf,
+        "dkim":   header_result.auth.dkim,
+        "dmarc":  header_result.auth.dmarc,
+        "present": header_result.auth.present,
+    }
 
     return RiskResult(
         score=overall,
@@ -314,15 +355,42 @@ def build_risk_result(
         threats=threats,
         findings=findings,
         recommendation=recommendation,
+        confidence=confidence,
+        authentication=authentication,
+        evidence=evidence,
+        classification=classification,
     )
+
+
+def _compute_confidence(parsed, header_result, sender_result, url_result, content_result, attachment_result) -> float:
+    """
+    Estimate how much reliable evidence the analysis was based on.
+
+    Starts at 1.0 and reduces when key data is missing:
+      - No structured headers / no auth evidence  → -0.35 (can't verify spoofing)
+      - No From address                           → -0.25 (can't verify sender)
+      - Very low content score with no findings   → -0.10
+    The value is clamped to [0, 1] and rounded to 2 decimals.
+    """
+    c = 1.0
+
+    if not parsed.has_headers or not header_result.auth.present:
+        c -= 0.35
+    if not parsed.from_address:
+        c -= 0.25
+    if content_result.score == 0 and not content_result.findings:
+        c -= 0.10
+
+    c = max(0.0, min(1.0, c))
+    return round(c, 2)
 
 
 # ── Threat card builder ───────────────────────────────────────────────────────
 
-def _build_threats(sender, url, content, attachment, overall_level) -> List[Dict]:
+def _build_threats(sender, url, content, attachment, header, overall_level) -> List[Dict]:
     """
-    Build the 4 fixed threat-card objects expected by the frontend:
-      sender, url, urgency, attachment
+    Build the threat-card objects expected by the frontend:
+      sender, url, urgency, attachment, auth
     Severity is derived from sub-scores and matched findings.
     """
 
@@ -375,19 +443,31 @@ def _build_threats(sender, url, content, attachment, overall_level) -> List[Dict
     else:
         attach_desc = "No attachments found in the email."
 
+    # Header / authentication threat
+    auth_sev = _sev(header.score)
+    if auth_sev == "HIGH":
+        auth_desc = header.findings[0].detail if header.findings else "Header/authentication indicators are suspicious."
+    elif auth_sev == "MEDIUM":
+        auth_desc = "Header or authentication indicators raised some concerns (Reply-To/Return-Path mismatch or auth failures)."
+    elif not header.has_headers:
+        auth_desc = "No full header block provided — authentication could not be verified."
+    else:
+        auth_desc = "Header alignment and authentication results appear healthy."
+
     return [
         {"id": "sender",     "title": "Sender Analysis",       "description": sender_desc,     "severity": sender_sev,     "icon": "user-x"},
         {"id": "url",        "title": "URL / Link Analysis",    "description": url_desc,        "severity": url_sev,        "icon": "link"},
         {"id": "urgency",    "title": "Content & Manipulation", "description": urg_desc,        "severity": urg_sev,        "icon": "alert-triangle"},
         {"id": "attachment", "title": "Attachment Risk",        "description": attach_desc,     "severity": attach_sev,     "icon": "paperclip"},
+        {"id": "auth",       "title": "Header & Authentication","description": auth_desc,        "severity": auth_sev,       "icon": "shield"},
     ]
 
 
 # ── Findings list builder ─────────────────────────────────────────────────────
 
-def _build_findings(sender, url, content, attachment) -> List[Dict]:
+def _build_findings(sender, url, content, attachment, header) -> List[Dict]:
     """
-    Flatten all granular findings from the four analyzers into a single list
+    Flatten all granular findings from the five analyzers into a single list
     of finding-row dicts. Each gets a unique sequential ID (f1, f2, …).
     """
     rows = []
@@ -437,6 +517,17 @@ def _build_findings(sender, url, content, attachment) -> List[Dict]:
         })
         idx += 1
 
+    # Header / authentication findings
+    for f in header.findings:
+        sev = f.severity
+        rows.append({
+            "id":       f"f{idx}",
+            "label":    f.label,
+            "text":     f.detail,
+            "severity": sev,
+        })
+        idx += 1
+
     # If no findings at all, add a positive SAFE finding
     if not rows:
         rows.append({
@@ -449,9 +540,63 @@ def _build_findings(sender, url, content, attachment) -> List[Dict]:
     return rows
 
 
+# ── Evidence builder ──────────────────────────────────────────────────────────
+
+def _build_evidence(level, sender, url, content, attachment, header) -> List[str]:
+    """
+    Produce a concise, human-readable list of reasons the email was flagged —
+    the "why this email was flagged" / evidence section. Each item reads as a
+    standalone explanation of a distinct issue. Falls back to a reassuring
+    note when the email looks clean.
+    """
+    items: List[str] = []
+
+    for f in sender.findings:
+        if f.points >= 15:
+            items.append(f"Sender: {f.detail}")
+
+    for f in url.findings:
+        if f.points >= 12:
+            items.append(f"Link: {f.detail}")
+
+    for f in content.findings:
+        if f.points >= 10:
+            items.append(f"Language: {f.label}.")
+
+    for f in attachment.findings:
+        if f.points >= 12:
+            items.append(f"Attachment: {f.detail}")
+
+    for f in header.findings:
+        items.append(f"{f.label}: {f.detail}")
+
+    # Deduplicate while preserving order
+    seen = set()
+    unique = []
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            unique.append(item)
+    items = unique
+
+    if not items:
+        if level == "HIGH":
+            items.append("Score reached HIGH despite few granular signals — dominant threat vector detected.")
+        else:
+            items.append("No high-confidence suspicious indicators were detected in this email.")
+
+    # Always end with the core takeaway.
+    items.append(
+        "This summary is based on deterministic rule-based indicators; authentication "
+        "failures or sender mismatches are treated as risk signals, not proof of malice."
+    )
+
+    return items
+
+
 # ── Recommendation builder ────────────────────────────────────────────────────
 
-def _build_recommendation(level, sender, url, content, attachment) -> str:
+def _build_recommendation(level, sender, url, content, attachment, header) -> str:
     if level == "HIGH":
         parts = ["⚠️ This email shows multiple high-confidence phishing indicators. Do NOT click any links or provide credentials."]
         if sender.score >= 40:
@@ -462,16 +607,21 @@ def _build_recommendation(level, sender, url, content, attachment) -> str:
             parts.append("The email uses social engineering (urgency/threats) to bypass your judgment — be extra cautious.")
         if attachment.score >= 40:
             parts.append("Do not open or download any attached files — they are suspicious and may contain malware.")
+        if header.score >= 40:
+            parts.append("Sender authentication (SPF/DKIM/DMARC) or header alignment is failing — the From address may be spoofed.")
         parts.append("Report this email to your IT/security team immediately.")
         return " ".join(parts)
 
     elif level == "MEDIUM":
-        return (
+        parts = [
             "Exercise caution with this email. While it is not definitively malicious, "
             "several indicators warrant attention. Verify the sender's identity before "
             "clicking any links or providing information. When in doubt, contact the "
             "organization through their official website or phone number."
-        )
+        ]
+        if header.score >= 35 and not header.auth.present:
+            parts.append("The email was provided without full header/authentication data, so spoofing could not be ruled out.")
+        return " ".join(parts)
     else:
         return (
             "This email appears safe based on all analyzed indicators. "

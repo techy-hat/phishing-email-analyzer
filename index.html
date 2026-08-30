@@ -213,7 +213,38 @@
                 <div class="vb-track"><div class="vb-fill" id="bar-attachment"></div></div>
                 <span class="vb-pct" id="pct-attachment">—</span>
               </div>
+              <div class="vb-item">
+                <span class="vb-label">Header</span>
+                <div class="vb-track"><div class="vb-fill" id="bar-header"></div></div>
+                <span class="vb-pct" id="pct-header">—</span>
+              </div>
             </div>
+          </div>
+
+          <!-- VERDICT SUB-STRIP: classification + confidence -->
+          <div class="verdict-sub">
+            <span class="vs-class" id="classificationLabel"></span>
+            <span class="vs-meta">Detection confidence <strong id="confidenceValue">—</strong></span>
+          </div>
+
+          <!-- EMAIL AUTHENTICATION -->
+          <div class="result-block" role="region" aria-label="Email authentication">
+            <h3 class="block-heading">Email Authentication</h3>
+            <div class="auth-grid" id="authGrid">
+              <div class="auth-item" data-mech="spf">
+                <span class="auth-name">SPF</span>
+                <span class="auth-state" id="auth-spf">—</span>
+              </div>
+              <div class="auth-item" data-mech="dkim">
+                <span class="auth-name">DKIM</span>
+                <span class="auth-state" id="auth-dkim">—</span>
+              </div>
+              <div class="auth-item" data-mech="dmarc">
+                <span class="auth-name">DMARC</span>
+                <span class="auth-state" id="auth-dmarc">—</span>
+              </div>
+            </div>
+            <p class="auth-note">Authentication failures and sender mismatches are treated as <strong>risk signals</strong>, not proof of malice — legitimate mail can fail these checks for benign reasons (forwarding, lists, misconfiguration).</p>
           </div>
 
           <!-- THREAT TABLE -->
@@ -229,6 +260,13 @@
               <span class="block-count" id="findingsCount"></span>
             </div>
             <div class="findings-table" id="findingsList" role="list"></div>
+          </div>
+
+          <!-- EVIDENCE -->
+          <div class="result-block" role="region" aria-label="Why this email was flagged">
+            <h3 class="block-heading">Why This Email Was Flagged</h3>
+            <p class="evidence-summary" id="evidenceSummary"></p>
+            <ul class="evidence-list" id="evidenceList" role="list"></ul>
           </div>
 
           <!-- RECOMMENDATION -->

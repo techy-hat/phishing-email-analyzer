@@ -30,6 +30,17 @@ class ParsedEmail:
     subject:      Optional[str] = None
     body:         str = ""
     headers_raw:  str = ""
+    headers:      Dict[str, str] = field(default_factory=dict)  # lowercase -> raw value
+    to_address:   Optional[str] = None
+    reply_to:     Optional[str] = None
+    return_path:  Optional[str] = None
+    message_id:   Optional[str] = None
+    date:         Optional[str] = None
+    authentication_results: str = ""
+    spf:          Optional[str] = None   # e.g. "pass" | "fail" | None
+    dkim:         Optional[str] = None   # e.g. "pass" | "fail" | None
+    dmarc:        Optional[str] = None   # e.g. "pass" | "fail" | None
+    has_headers:  bool = False           # True if input had a structured header block
     attachments:  List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -61,6 +72,30 @@ def parse_email(raw: str) -> ParsedEmail:
     parsed.headers_raw = "\n".join(
         f"{k}: {v}" for k, v in msg.items()
     )
+
+    # Build a lowercase-keyed headers dict for downstream analyzers
+    for k, v in msg.items():
+        parsed.headers.setdefault(k.lower(), v)
+
+    parsed.has_headers = bool(list(msg.items()))
+
+    # ── Additional header fields ───────────────────────────────────────────────
+    parsed.to_address, _ = _parse_from_header(msg.get("To", ""))
+    parsed.reply_to, _   = _parse_from_header(msg.get("Reply-To", ""))
+    parsed.return_path, _ = _parse_from_header(msg.get("Return-Path", ""))
+    parsed.message_id = msg.get("Message-ID") or None
+    parsed.date       = msg.get("Date") or None
+    parsed.authentication_results = msg.get("Authentication-Results", "")
+
+    # ── Parse SPF / DKIM / DMARC from Authentication-Results / headers ─────────
+    auth_all = (
+        msg.get("Authentication-Results", "") + "\n" +
+        msg.get("Received-SPF", "") + "\n" +
+        msg.get("DKIM-Signature", "")
+    )
+    parsed.spf   = _parse_auth_mechanism(auth_all, ("spf", "smtp.mailfrom"))
+    parsed.dkim  = _parse_auth_mechanism(auth_all, "dkim")
+    parsed.dmarc = _parse_auth_mechanism(auth_all, "dmarc")
 
     # Extract body
     if msg.is_multipart():
@@ -190,3 +225,33 @@ def _extract_attachments(msg) -> List[Dict[str, Any]]:
         })
 
     return attachments
+
+
+def _parse_auth_mechanism(text: str, mechanisms) -> Optional[str]:
+    """
+    Extract the pass/fail/skip result for an auth mechanism (SPF/DKIM/DMARC)
+    from an Authentication-Results / Received-SPF / DKIM-Signature block.
+
+    `mechanisms` may be a single string or a tuple of names to look for.
+    Looks for a pattern like `spf=pass` (optionally with a detail footer).
+    Returns None when unresolved or irrelevant.
+    """
+    if not text:
+        return None
+    if isinstance(mechanisms, str):
+        mechanisms = (mechanisms,)
+    m_re = "|".join(re.escape(m) for m in mechanisms)
+    # Format in Authentication-Results: spf=pass (detail) ... or spf "pass"
+    match = re.search(
+        re.compile(rf"(?:{m_re})\s*=\s*[\"']?([A-Za-z-]+)", re.IGNORECASE), text
+    )
+    if match:
+        return match.group(1).lower()
+    # Received-SPF / DKIM signature alternate forms
+    match2 = re.search(
+        re.compile(rf"(?:{m_re}) \(([^)]*?)\s*(\bpass\b|\bfail\b|\bneutral\b|\bnone\b|\bsoftfail\b)", re.IGNORECASE),
+        text,
+    )
+    if match2:
+        return match2.group(2).lower()
+    return None

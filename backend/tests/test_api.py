@@ -49,8 +49,14 @@ def test_analyze_returns_expected_contract():
     assert 0 <= data["score"] <= 100
     assert data["level"] in ("HIGH", "MEDIUM", "LOW")
     assert "attachment" in data["breakdown"]  # new attachment sub-score present
+    assert "header" in data["breakdown"]      # new header/auth sub-score present
     assert isinstance(data["threats"], list)
     assert isinstance(data["findings"], list)
+    # New fields: classification, confidence, authentication, evidence
+    assert data["classification"] in ("likely_phishing", "suspicious", "likely_benign")
+    assert 0.0 <= data["confidence"] <= 1.0
+    assert "spf" in data["authentication"] and "dmarc" in data["authentication"]
+    assert isinstance(data["evidence"], list) and len(data["evidence"]) > 0
 
 
 def test_analyze_flags_phishing_as_high_risk():
@@ -100,3 +106,40 @@ def test_analyze_attachment_indicators():
     assert resp.status_code == 200
     data = resp.json()
     assert data["breakdown"]["attachment"] >= 35
+
+
+def test_analyze_eml_upload_endpoint():
+    eml = (
+        "From: PayPal Support <security@paypa1-login.com>\n"
+        "To: victim@example.com\n"
+        "Subject: URGENT\n"
+        "Authentication-Results: mx.example.com; spf=fail; dmarc=fail\n"
+        "\n"
+        "Verify at http://secure-login-paypal-verify.com now\n"
+    ).encode("utf-8")
+    resp = client.post(
+        "/api/analyze-eml",
+        files={"file": ("phishing.eml", eml, "message/rfc822")},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "result" in data
+    result = data["result"]
+    assert "breakdown" in result and "header" in result["breakdown"]
+    assert "authentication" in result
+
+
+def test_analyze_eml_rejects_bad_extension():
+    resp = client.post(
+        "/api/analyze-eml",
+        files={"file": ("notes.docx", b"hello", "application/octet-stream")},
+    )
+    assert resp.status_code == 415
+
+
+def test_analyze_eml_rejects_empty():
+    resp = client.post(
+        "/api/analyze-eml",
+        files={"file": ("empty.eml", b"", "message/rfc822")},
+    )
+    assert resp.status_code == 422
