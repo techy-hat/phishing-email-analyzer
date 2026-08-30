@@ -27,55 +27,55 @@ const $ = id => document.getElementById(id);
 const $$ = sel => document.querySelectorAll(sel);
 
 const dom = {
-  navbar:             $('navbar'),
-  navToggle:          $('navToggle'),
-  navLinks:           $('navLinks'),
-  tabPaste:           $('tab-paste'),
-  tabUpload:          $('tab-upload'),
-  panelPaste:         $('panel-paste'),
-  panelUpload:        $('panel-upload'),
-  emailInput:         $('emailInput'),
-  charCounter:        $('charCounter'),
-  uploadArea:         $('uploadArea'),
-  uploadIdle:         $('uploadIdle'),
-  uploadSelected:     $('uploadSelected'),
-  fileInput:          $('fileInput'),
-  browseBtn:          $('browseBtn'),
-  fileName:           $('fileName'),
-  fileSize:           $('fileSize'),
-  fileRemove:         $('fileRemove'),
-  dragOverlay:        $('dragOverlay'),
-  analyzeBtn:         $('analyzeBtn'),
-  clearBtn:           $('clearBtn'),
-  analyzerCard:       $('analyzerCard'),
-  scanLoader:         $('scanLoader'),
-  resultsDashboard:   $('resultsDashboard'),
-  newAnalysisBtn:     $('newAnalysisBtn'),
-  analysisTimestamp:  $('analysisTimestamp'),
-  scoreNumber:        $('scoreNumber'),
-  riskLabel:          $('riskLabel'),
-  verdictStrip:       $('verdictStrip'),
-  verdictDot:         $('verdictDot'),
-  barSender:          $('bar-sender'),
-  barLinks:           $('bar-links'),
-  barContent:         $('bar-content'),
-  barAttachment:      $('bar-attachment'),
-  barHeader:          $('bar-header'),
-  pctSender:          $('pct-sender'),
-  pctLinks:           $('pct-links'),
-  pctContent:         $('pct-content'),
-  pctAttachment:      $('pct-attachment'),
-  pctHeader:          $('pct-header'),
+  navbar: $('navbar'),
+  navToggle: $('navToggle'),
+  navLinks: $('navLinks'),
+  tabPaste: $('tab-paste'),
+  tabUpload: $('tab-upload'),
+  panelPaste: $('panel-paste'),
+  panelUpload: $('panel-upload'),
+  emailInput: $('emailInput'),
+  charCounter: $('charCounter'),
+  uploadArea: $('uploadArea'),
+  uploadIdle: $('uploadIdle'),
+  uploadSelected: $('uploadSelected'),
+  fileInput: $('fileInput'),
+  browseBtn: $('browseBtn'),
+  fileName: $('fileName'),
+  fileSize: $('fileSize'),
+  fileRemove: $('fileRemove'),
+  dragOverlay: $('dragOverlay'),
+  analyzeBtn: $('analyzeBtn'),
+  clearBtn: $('clearBtn'),
+  analyzerCard: $('analyzerCard'),
+  scanLoader: $('scanLoader'),
+  resultsDashboard: $('resultsDashboard'),
+  newAnalysisBtn: $('newAnalysisBtn'),
+  analysisTimestamp: $('analysisTimestamp'),
+  scoreNumber: $('scoreNumber'),
+  riskLabel: $('riskLabel'),
+  verdictStrip: $('verdictStrip'),
+  verdictDot: $('verdictDot'),
+  barSender: $('bar-sender'),
+  barLinks: $('bar-links'),
+  barContent: $('bar-content'),
+  barAttachment: $('bar-attachment'),
+  barHeader: $('bar-header'),
+  pctSender: $('pct-sender'),
+  pctLinks: $('pct-links'),
+  pctContent: $('pct-content'),
+  pctAttachment: $('pct-attachment'),
+  pctHeader: $('pct-header'),
   classificationLabel: $('classificationLabel'),
-  confidenceValue:    $('confidenceValue'),
-  authSpf:            $('auth-spf'),
-  authDkim:           $('auth-dkim'),
-  authDmarc:          $('auth-dmarc'),
-  threatCards:        $('threatCards'),
-  findingsList:       $('findingsList'),
-  findingsCount:      $('findingsCount'),
-  evidenceSummary:    $('evidenceSummary'),
-  evidenceList:       $('evidenceList'),
+  confidenceValue: $('confidenceValue'),
+  authSpf: $('auth-spf'),
+  authDkim: $('auth-dkim'),
+  authDmarc: $('auth-dmarc'),
+  threatCards: $('threatCards'),
+  findingsList: $('findingsList'),
+  findingsCount: $('findingsCount'),
+  evidenceSummary: $('evidenceSummary'),
+  evidenceList: $('evidenceList'),
   recommendationText: $('recommendationText'),
   recommendationCard: $('recommendationCard')
 };
@@ -268,7 +268,7 @@ function runLoader() {
 
 function renderResults(result) {
   const { score, level, breakdown, threats, findings, recommendation,
-          confidence, classification, authentication, evidence } = result;
+    confidence, classification, authentication, evidence } = result;
   const lvl = level.toLowerCase();
 
   // Timestamp
@@ -292,15 +292,15 @@ function renderResults(result) {
   // Breakdown bars (include new header category if present)
   setTimeout(() => {
     setBar(dom.barSender, dom.pctSender, breakdown.sender, lvl);
-    setBar(dom.barLinks,  dom.pctLinks,  breakdown.links,  lvl);
+    setBar(dom.barLinks, dom.pctLinks, breakdown.links, lvl);
     setBar(dom.barContent, dom.pctContent, breakdown.content, lvl);
     setBar(dom.barAttachment, dom.pctAttachment, breakdown.attachment, lvl);
     if (dom.barHeader) setBar(dom.barHeader, dom.pctHeader, breakdown.header, lvl);
   }, 300);
 
   // Authentication grid
-  setAuth('spf',   authentication);
-  setAuth('dkim',  authentication);
+  setAuth('spf', authentication);
+  setAuth('dkim', authentication);
   setAuth('dmarc', authentication);
 
   // Threat table
@@ -401,10 +401,10 @@ function setBar(barEl, pctEl, value, levelClass) {
 }
 
 function sevColor(sev) {
-  if (sev === 'high')         return 'var(--danger)';
-  if (sev === 'medium')       return 'var(--warn)';
+  if (sev === 'high') return 'var(--danger)';
+  if (sev === 'medium') return 'var(--warn)';
   if (sev === 'not_analyzed') return 'var(--text-3)';
-  if (sev === 'unknown')      return 'var(--text-3)';
+  if (sev === 'unknown') return 'var(--text-3)';
   return 'var(--ok)';
 }
 
@@ -483,7 +483,7 @@ async function handleAnalyze() {
         // parse the full header block (SPF/DKIM/DMARC, Reply-To, Return-Path).
         const fd = new FormData();
         fd.append('file', state.selectedFile, state.selectedFile.name);
-        response = await fetch('http://127.0.0.1:8000/api/analyze-eml', {
+        response = await fetch('/api/analyze-eml', {
           method: 'POST',
           body: fd
         });
@@ -495,10 +495,10 @@ async function handleAnalyze() {
         } else {
           content = await readFileAsText(state.selectedFile);
         }
-        response = await fetch('http://127.0.0.1:8000/api/analyze', {
-          method:  'POST',
+        response = await fetch('/api/analyze', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ email: content })
+          body: JSON.stringify({ email: content })
         });
       }
     } catch (networkErr) {
@@ -584,7 +584,7 @@ class ApiError extends Error {
 function readFileAsText(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload  = e => resolve(e.target.result);
+    reader.onload = e => resolve(e.target.result);
     reader.onerror = () => reject(new Error('Could not read the selected file.'));
     reader.readAsText(file);
   });
