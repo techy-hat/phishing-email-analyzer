@@ -15,6 +15,17 @@
 
 'use strict';
 
+// ─── [0] API BASE URL ────────────────────────────────────────────────────────
+// The FastAPI backend runs on http://localhost:8000 (see backend/start_server.bat).
+// When the frontend is served from the API's own origin (deployed on Vercel, or
+// opened directly on port 8000) the relative /api/* paths work as-is. When the
+// page is served elsewhere (Live Server, python -m http.server, or file://) we
+// must point at the local backend explicitly.
+const isLocalHost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+const API_BASE = (isLocalHost && location.port !== '8000')
+  ? 'http://localhost:8000'
+  : '';
+
 // ─── [1] STATE ────────────────────────────────────────────────────────────────
 const state = {
   activeTab: 'paste',
@@ -483,7 +494,7 @@ async function handleAnalyze() {
         // parse the full header block (SPF/DKIM/DMARC, Reply-To, Return-Path).
         const fd = new FormData();
         fd.append('file', state.selectedFile, state.selectedFile.name);
-        response = await fetch('/api/analyze-eml', {
+        response = await fetch(API_BASE + '/api/analyze-eml', {
           method: 'POST',
           body: fd
         });
@@ -495,7 +506,7 @@ async function handleAnalyze() {
         } else {
           content = await readFileAsText(state.selectedFile);
         }
-        response = await fetch('/api/analyze', {
+        response = await fetch(API_BASE + '/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: content })
